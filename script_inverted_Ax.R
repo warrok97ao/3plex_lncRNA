@@ -8,9 +8,9 @@ library(data.table)
 # 2. cCRE: Controls for general open chromatin (rules out accessibility bias).
 # 3. Biosample: Controls for cell-type specific chromatin (strictest control).
 files <- list(
-  "Random_Negatives" = "/home/aleone/Random_Negatives/ALL_shape.3plex_stability.matrix",
-  "cCRE_Balanced"    = "/home/aleone/cCRE_Balanced/ALL_shape.3plex_stability.matrix",
-  "Biosample_Specific" = "/home/aleone/Biosample_Specific/ALL_shape.3plex_stability.matrix"
+  "Random_Negatives" = "Random_Negatives/ALL_shape.3plex_stability.matrix",
+  "cCRE_Balanced"    = "cCRE_Balanced/ALL_shape.3plex_stability.matrix",
+  "Biosample_Specific" = "Biosample_Specific/ALL_shape.3plex_stability.matrix"
 )
 
 shape_features <- c("HelT", "MGW", "ProT", "Roll")
