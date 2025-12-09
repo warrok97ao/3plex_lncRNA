@@ -10,7 +10,7 @@ library(data.table)
 files <- list(
   "Random_Negatives" = "Random_Negatives/ALL_shape.3plex_stability.matrix",
   "cCRE_Balanced"    = "cCRE_Balanced/ALL_shape.3plex_stability.matrix",
-  "Biosample_Specific" = "Biosample_Specific/ALL_shape.3plex_stability.matrix"
+  "Biosample_Specific" = "/home/aleone/Biosample_Specific/ALL_shape.3plex_stability.matrix"
 )
 
 shape_features <- c("HelT", "MGW", "ProT", "Roll")
@@ -164,7 +164,7 @@ run_region_analysis <- function(dataset_name, file_path) {
 # Run Region Analysis ONLY on one file.
 # Since we only look at Positive peaks, and the Positives are identical in all 3 files,
 # running this once is sufficient.
-run_region_analysis("cCRE_Balanced", files[["Random_Negatives"]])
+run_region_analysis("Random_Negatives", files[["Random_Negatives"]])
 
 #In the Random_Negatives file, the Median is calculated on [Positives + Random DNA].
 #In the cCRE_Balanced file, the Median is calculated on [Positives + Open Chromatin].
