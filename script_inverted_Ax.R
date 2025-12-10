@@ -47,7 +47,7 @@ run_analysis <- function(dataset_name, file_path) {
     ) %>%
     rename(label = `get(label_col)`) %>%
     mutate(
-      Type = ifelse(label == 1 | label == "pos", "Positive", "Negative"),
+      Type = ifelse(label == "pos", "Positive", "Negative"),
       Type = factor(Type, levels = c("Negative", "Positive")) 
     )
 
@@ -76,10 +76,10 @@ run_analysis <- function(dataset_name, file_path) {
   stat_cor(
     data = subset(df_long, Type == "Positive"),
     method = "pearson",
-    label.x.npc = 1,     # Align to far left edge
-      label.y.npc = 0.98,     # Align to very top edge
-      hjust = 1,           # Left-justify text
-      vjust = 0.25,           # Top-justify box (makes it hang DOWN)
+    label.x.npc = 1,     
+      label.y.npc = 0.98,     
+      hjust = 1,           
+      vjust = 0.25,           
     size = 3,
     label.sep = "\n",
     geom = "label",
@@ -89,7 +89,6 @@ run_analysis <- function(dataset_name, file_path) {
     label.r = unit(0.15, "lines")
   ) +
 
-  # ---- ADD THIS LINE ----
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
 
   facet_wrap(~Feature, scales = "free") +
@@ -158,9 +157,31 @@ run_region_analysis <- function(dataset_name, file_path, bins = 25, top_percent 
 
   # --- PLOT A: SCATTER WITH ALL POINTS, COLORED BY GLOBAL TOP X% vs REST ---
   p_overall_points <- ggplot(df_long, aes(x = Shape_Value, y = .data[[score_col]], color = Group_global)) +
-    geom_point(alpha = 0.1, size = 1) +
-    geom_smooth(method = "lm", color = "black", linetype = "dashed") +
-    stat_cor(method = "pearson", label.x.npc = "left", label.y.npc = "top", color = "black") +
+    geom_point(alpha = 0.2, size = 1) +
+    geom_smooth(
+      aes(group = 1),  # Force single line, don't inherit color grouping
+      method = "lm", 
+      color = "black", 
+      linetype = "dashed",
+      se = FALSE
+    ) +
+    stat_cor(
+      aes(group = 1),  # Same here
+      method = "pearson", 
+      label.x.npc = 1,     
+      label.y.npc = 1,     
+      hjust = 1,           
+      vjust = 1,           
+      size = 3.5,
+      label.sep = "\n",
+      geom = "label",
+      fill = "white",
+      color = "black",
+      alpha = 0.95,
+      label.padding = unit(0.5, "lines"),
+      label.r = unit(0.15, "lines")
+    ) +
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
     facet_wrap(~Feature, scales = "free") +
     scale_color_manual(
       values = c("Rest" = "gray80", "Top" = "gold"),
@@ -170,6 +191,7 @@ run_region_analysis <- function(dataset_name, file_path, bins = 25, top_percent 
       ),
       name = "3plex score group"
     ) +
+    guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +  # Make legend clearer
     labs(
       title    = paste("Region-Level Correlation (Points):", dataset_name),
       subtitle = paste0(
@@ -180,44 +202,29 @@ run_region_analysis <- function(dataset_name, file_path, bins = 25, top_percent 
       y = "3plex Stability Score"
     ) +
     theme_bw() +
-    theme(legend.position = "bottom")
+    theme(
+      strip.background = element_rect(fill = "#f0f0f0"),
+      strip.text = element_text(face = "bold", size = 12),
+      legend.position = "bottom",
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 11),
+      axis.title = element_text(size = 11),
+      axis.text = element_text(size = 9),
+      legend.text = element_text(size = 10)
+    )
 
-  ggsave(
-    paste0("RegionPlot_OVERALL_POINTS_", dataset_name, "_Top", top_percent * 100, ".png"),
-    p_overall_points, width = 10, height = 8, dpi = 300
-  )
+  output_filename_pdf <- paste0("RegionPlot_OVERALL_POINTS_", dataset_name, "_Top", top_percent * 100, ".pdf")
+  ggsave(output_filename_pdf, plot = p_overall_points, width = 10, height = 8, device = "pdf")
+  message(paste("Saved PDF plot to:", output_filename_pdf))
+  
+  # Optional PNG backup
+  output_filename_png <- paste0("RegionPlot_OVERALL_POINTS_", dataset_name, "_Top", top_percent * 100, ".png")
+  ggsave(output_filename_png, plot = p_overall_points, width = 10, height = 8, dpi = 600)
 
-  # --- PLOT B: HEXBIN VERSION (unchanged except using Group_global if needed) ---
-  p_overall_hex <- ggplot(df_long, aes(x = Shape_Value, y = .data[[score_col]])) +
-    stat_bin_hex(aes(fill = ..count..), bins = bins, alpha = 0.9) +
-    geom_smooth(method = "lm", color = "black", linetype = "dashed", se = FALSE) +
-    stat_cor(
-      method = "pearson", label.x.npc = "left",
-      label.y.npc = "top", color = "black", size = 4
-    ) +
-    scale_fill_viridis_c(
-      option = "C", trans = "log10", name = "Peak count"
-    ) +
-    facet_wrap(~Feature, scales = "free") +
-    labs(
-      title    = paste("Region-Level Correlation (Hexbin):", dataset_name),
-      subtitle = "Each hexagon summarizes multiple positive genomic peaks",
-      x = "DNA Shape Value",
-      y = "3plex Stability Score",
-      fill = "Peak count"
-    ) +
-    theme_bw() +
-    theme(legend.position = "bottom")
-
-  ggsave(
-    paste0("RegionPlot_OVERALL_HEX_", dataset_name, ".png"),
-    p_overall_hex, width = 10, height = 8, dpi = 300
-  )
-# --- PLOT B: POINTS COLORED BY DENSITY (Professor's Request) ---
+  # --- PLOT: POINTS COLORED BY DENSITY ---
   p_overall_density <- ggplot(df_long, aes(x = Shape_Value, y = .data[[score_col]])) +
     
-    # geom_pointdensity calculates the density of neighbors for each point
-    geom_pointdensity(adjust = 4, size = 2) + 
+    geom_pointdensity(adjust = 4, size = 0.5, alpha = 0.6) + 
     
     # Add the trend line on top
     geom_smooth(method = "lm", color = "black", linetype = "dashed", se = FALSE) +
@@ -225,38 +232,60 @@ run_region_analysis <- function(dataset_name, file_path, bins = 25, top_percent 
     # Pearson correlation stats
     stat_cor(
       method = "pearson", 
-      label.x.npc = "left", 
-      label.y.npc = "top", 
-      color = "black", 
-      size = 4
+      label.x.npc = 1,     
+      label.y.npc = 1,     
+      hjust = 1,           
+      vjust = 1,           
+      size = 3.5,
+      label.sep = "\n",
+      geom = "label",
+      fill = "white",
+      color = "black",
+      alpha = 0.95,
+      label.padding = unit(0.5, "lines"),
+      label.r = unit(0.15, "lines")
     ) +
     
-    # Use the 'viridis' color scale (same as your example image)
-    # option = "C" is 'plasma' (warm colors), "D" is standard viridis (purple-green-yellow)
+    scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+    
+    # Use the 'viridis' color scale
     scale_color_viridis_c(
-      option = "D",   # Change to "C" if you want the orange/purple look
-      name = "Density"
+      option = "D",
+      name = "Local Density"
     ) +
     
     facet_wrap(~Feature, scales = "free") +
     
     labs(
       title = paste("Region-Level Correlation (Density):", dataset_name),
-      subtitle = "Points colored by local density (lighter color = more overlapping points)",
+      subtitle = "Points colored by local density (lighter = higher density)",
       x = "DNA Shape Value",
       y = "3plex Stability Score"
     ) +
     theme_bw() +
-    theme(legend.position = "right")
+    theme(
+      strip.background = element_rect(fill = "#f0f0f0"),
+      strip.text = element_text(face = "bold", size = 12),
+      legend.position = "right",
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 11),
+      axis.title = element_text(size = 11),
+      axis.text = element_text(size = 9),
+      legend.text = element_text(size = 10)
+    )
 
-  ggsave(
-    paste0("RegionPlot_OVERALL_DENSITY_", dataset_name,".png"), 
-    p_overall_density, 
-    width = 10, 
-    height = 8, 
-    dpi = 300
-  )
-  # --- NEW: PER-LncRNA TOP X% GROUP FOR FACETED PLOT ---
+  # Save as PDF for publication
+  output_filename_pdf <- paste0("RegionPlot_OVERALL_DENSITY_", dataset_name, ".pdf")
+  ggsave(output_filename_pdf, plot = p_overall_density, width = 10, height = 8, device = "pdf")
+  message(paste("Saved PDF plot to:", output_filename_pdf))
+  
+  # Optional PNG backup
+  output_filename_png <- paste0("RegionPlot_OVERALL_DENSITY_", dataset_name, ".png")
+  ggsave(output_filename_png, plot = p_overall_density, width = 10, height = 8, dpi = 600)
+  message(paste("Saved PNG plot to:", output_filename_png))
+
+
+    # --- PER-LncRNA TOP X% GROUP FOR FACETED PLOT ---
 
   df_pos_lncRNA <- df %>%
     filter(get(label_col) == "pos") %>%
@@ -281,7 +310,13 @@ run_region_analysis <- function(dataset_name, file_path, bins = 25, top_percent 
                           y = .data[[score_col]],
                           color = Group_lncRNA)) +
     geom_point(alpha = 0.4, size = 0.5) +
-    geom_smooth(method = "lm", color = "black", se = FALSE, size = 0.5) +
+    geom_smooth(
+      aes(group = 1),  # Single regression line per facet
+      method = "lm", 
+      color = "black", 
+      se = FALSE, 
+      linewidth = 0.5  # Use linewidth instead of deprecated size
+    ) +
     facet_grid(lncRNA ~ Feature, scales = "free") +
     scale_color_manual(
       values = c("Rest" = "gray80", "Top" = "gold"),
@@ -291,21 +326,35 @@ run_region_analysis <- function(dataset_name, file_path, bins = 25, top_percent 
       ),
       name = "3plex score group (per lncRNA)"
     ) +
+    guides(color = guide_legend(override.aes = list(size = 4, alpha = 1))) +  # Clear legend symbols
     theme_bw() +
     theme(
-      strip.text.y = element_text(angle = 0, size = 7),
-      axis.text    = element_text(size = 6),
-      legend.position = "bottom"
+      strip.background = element_rect(fill = "#f0f0f0"),
+      strip.text.y = element_text(angle = 0, size = 7, face = "bold"),
+      strip.text.x = element_text(size = 8, face = "bold"),
+      axis.text = element_text(size = 6),
+      axis.title = element_text(size = 10),
+      legend.position = "bottom",
+      legend.text = element_text(size = 9),
+      legend.title = element_text(size = 10, face = "bold"),
+      plot.title = element_text(size = 13, face = "bold"),
+      plot.subtitle = element_text(size = 10)
     ) +
     labs(
-      title = paste("Per-LncRNA Correlation with Per-LncRNA Top", top_percent * 100, "% Highlighted:", dataset_name),
+      title = paste("Per-LncRNA Correlation:", dataset_name),
+      subtitle = paste0("Top ", top_percent * 100, "% 3plex score calculated per lncRNA (Positives Only)"),
       x = "DNA Shape Value",
       y = "3plex Stability Score"
     )
 
-  ggsave(
-    paste0("RegionPlot_FACETED_", dataset_name, "_Top", top_percent * 100, ".png"),
-    p_faceted, width = 12, height = 30, limitsize = FALSE, dpi = 300
-  )
+  # Save as PDF for publication
+  output_filename_pdf <- paste0("RegionPlot_FACETED_", dataset_name, "_Top", top_percent * 100, ".pdf")
+  ggsave(output_filename_pdf, plot = p_faceted, width = 12, height = 30, limitsize = FALSE, device = "pdf")
+  message(paste("Saved PDF plot to:", output_filename_pdf))
+  
+  # Optional PNG backup
+  output_filename_png <- paste0("RegionPlot_FACETED_", dataset_name, "_Top", top_percent * 100, ".png")
+  ggsave(output_filename_png, plot = p_faceted, width = 12, height = 30, limitsize = FALSE, dpi = 600)
+  message(paste("Saved PNG plot to:", output_filename_png))
 }
 run_region_analysis("Random_Negatives", files[["Random_Negatives"]])
