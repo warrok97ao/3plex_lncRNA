@@ -1,0 +1,133 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r, fig.width=12, fig.height=5}
+library(readxl)
+library(dplyr)
+library(ComplexHeatmap)
+library(tidyr)
+library(circlize)
+library(openxlsx)
+library(ggplot2)
+library(ggpubr)
+
+median_diff <- function (path, neg_type){
+  setwd(".")
+  df <- read.table(path, header=T, sep="\t")
+  colnames(df) <- tolower(colnames(df))
+  
+  #df_wide <- df %>%
+  #pivot_wider(
+  #  id_cols = c(id, lncrna, pos_neg),
+  #  names_from = shape,
+  #  values_from = mean
+  #)
+  
+  df <- df %>%
+  group_by(shape) %>%
+  mutate(mean_norm = (mean - median(mean)) / mad(mean)) %>%
+  ungroup()
+
+  ggplot(data=df, aes(color=shape, x=mean_norm)) + geom_density()
+  ggplot(data=df, aes(color=shape, x=mean)) + geom_density()
+  ggplot(data=df, aes(color=pos_neg, x=mean_norm)) + geom_density() + facet_grid(shape~lncrna, scales="free")
+
+
+  df$mean = df$mean_norm 
+  medians <- df %>%
+    group_by(lncrna, shape, pos_neg) %>%
+    summarise(md = median(mean, na.rm = TRUE), .groups = "drop")
+  
+  medians_avg <- df %>%
+    group_by(shape, pos_neg) %>%
+    summarise(md = median(mean, na.rm = TRUE), .groups = "drop")
+  medians_avg$lncrna <- "Total_average"
+  
+  subset_lncs <- c("NEAT1", "TERC", "MEG3", "Meg3", "lncSmad7", "HOTAIR", "CDKN2B-AS1")
+  df_subset <- df %>% filter(lncrna %in% subset_lncs)
+  med_7lnc <- df_subset %>%
+    group_by(shape, pos_neg) %>%
+    summarise(md = median(mean, na.rm = TRUE), .groups = "drop")
+  med_7lnc$lncrna <- "TPX-validated_lncRNAs_average"
+  
+  med_with_avgs <- bind_rows(medians, medians_avg, med_7lnc)
+  
+  
+  diff_med <- mutate(group_by(med_with_avgs, lncrna, shape), median_difference = md - lag(md), .keep = "none") %>% na.omit()
+  median_df <- pivot_wider(data = diff_med, id_cols = "shape", names_from = "lncrna", values_from = "median_difference") %>%.[-1]
+  median_matrix <- data.matrix(median_df, -1)
+  rownames(median_matrix) <- c("HelT", "MGW", "ProT", "Roll")
+
+  var = c("lncrna", "shape")
+  wilcoxon <- compare_means(mean ~ pos_neg, data = df, method = "wilcox.test", group.by = var, paired=FALSE)
+  wilc_avg <- compare_means(mean ~ pos_neg, data = df, method = "wilcox.test", group.by = "shape", paired=FALSE)
+  wilc_avg$lncrna <- "Total_average"
+  
+  subset_lncs <- c("NEAT1", "TERC", "MEG3", "Meg3", "lncSmad7", "HOTAIR", "CDKN2B-AS1")
+  df_subset <- df %>% filter(lncrna %in% subset_lncs)
+  wilc_7lnc <- compare_means(mean ~ pos_neg, data = df_subset, method = "wilcox.test", group.by = "shape", paired=FALSE)
+  wilc_7lnc$lncrna <- "TPX-validated_lncRNAs_average"
+  
+  p_with_avgs <- bind_rows(wilcoxon, wilc_avg, wilc_7lnc)
+  
+  pvalue <- p_with_avgs [,-3 : -7] %>%.[,-4 : -5]
+  pvalue[pvalue == "< 2e-16"] <- "2e-16"
+  pvalue[pvalue == "<2e-16"] <- "2e-16"
+  pvalue$p.format <- as.numeric(pvalue$p.format)
+  pvalue_df <- pivot_wider(data = pvalue, id_cols = "shape", names_from = "lncrna", values_from = "p.format") %>%.[-1]
+  pvalue_matrix <- data.matrix(pvalue_df, -1)
+  rownames(pvalue_matrix) <- c("HelT", "MGW", "ProT", "Roll")
+  lncs_keep <- c(
+    "7SK", "Bloodlinc", "1200007C13Rik@4T1", "AC018781.1",
+    "1200007C13Rik@NDL", "AL109615.3", "MIR503HG", "MEG3",
+    "CDKN2B-AS1", "HOTAIR", "lncSmad7", "TERC",
+    "Rn7sk", "MALAT1", "NEAT1", "AC087482.1"
+  )
+  
+  lncs_keep <- intersect(lncs_keep, colnames(pvalue_matrix))
+  median_matrix <- median_matrix[, lncs_keep, drop = FALSE]
+  pvalue_matrix <- pvalue_matrix[, lncs_keep, drop = FALSE]
+
+  wb_name <- paste("matrices_output_", neg_type, ".xlsx")
+  wb <- createWorkbook()
+  addWorksheet(wb, "Median Matrix")
+  writeData(wb, "Median Matrix", median_matrix, rowNames = TRUE)
+  addWorksheet(wb, "P-Value Matrix")
+  writeData(wb, "P-Value Matrix", pvalue_matrix, rowNames = TRUE)
+  saveWorkbook(wb, wb_name, overwrite = TRUE)
+
+  col_fun1 = circlize::colorRamp2(c(-1, 2), c("red", "green"))
+  Heatmap(
+    pvalue_matrix,
+    name = "Median_difference",
+    col = col_fun1,
+    rect_gp = gpar(type = "none"),
+    column_order = lncs_keep,
+    cell_fun = function(j, i, x, y, width, height, fill) {
+      grid.rect(
+        x = x, y = y, width = width, height = height,
+        gp = gpar(col = "grey", fill = NA)
+      )
+      grid.circle(
+        x = x, y = y,
+        r = (-log10(pvalue_matrix[i, j])) / 8.5 * min(unit.c(width, height)),
+        gp = gpar(fill = col_fun1(median_matrix[i, j]), col = NA)
+      )
+    },
+    cluster_rows = FALSE,
+    cluster_columns = FALSE
+  )
+    
+}
+```
+
+
+```{r, fig.width=25, fig.height=7}
+path = "ca_neg_regions/specific-no_low_DNase/ALL_shape.aggregated.fixed.gz"
+
+pdf("Median_diff.heatmap.pdf", width = 12, height = 5, pointsize = 13)
+median_diff("ca_neg_regions/specific-no_low_DNase/ALL_shape.aggregated.fixed.gz", "biosample_specific_cCREs")
+dev.off()
+```

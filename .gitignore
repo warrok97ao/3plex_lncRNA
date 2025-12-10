@@ -1,2 +1,8 @@
 *.png
 *.pdf
+*.xlsx
+*.RData
+*.rds
+*.tsv
+*.gz
+*.html
