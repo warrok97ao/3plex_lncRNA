@@ -11,7 +11,7 @@ library(tidyr)
 library(circlize)
 library(openxlsx)
 library(ggplot2)
-library(ggpubr)
+library(ggpubr) 
 
 median_diff <- function (path, neg_type){
   setwd(".")
@@ -79,16 +79,6 @@ median_diff <- function (path, neg_type){
   pvalue_df <- pivot_wider(data = pvalue, id_cols = "shape", names_from = "lncrna", values_from = "p.format") %>%.[-1]
   pvalue_matrix <- data.matrix(pvalue_df, -1)
   rownames(pvalue_matrix) <- c("HelT", "MGW", "ProT", "Roll")
-  lncs_keep <- c(
-    "7SK", "Bloodlinc", "1200007C13Rik@4T1", "AC018781.1",
-    "1200007C13Rik@NDL", "AL109615.3", "MIR503HG", "MEG3",
-    "CDKN2B-AS1", "HOTAIR", "lncSmad7", "TERC",
-    "Rn7sk", "MALAT1", "NEAT1", "AC087482.1"
-  )
-  
-  lncs_keep <- intersect(lncs_keep, colnames(pvalue_matrix))
-  median_matrix <- median_matrix[, lncs_keep, drop = FALSE]
-  pvalue_matrix <- pvalue_matrix[, lncs_keep, drop = FALSE]
 
   wb_name <- paste("matrices_output_", neg_type, ".xlsx")
   wb <- createWorkbook()
@@ -98,36 +88,25 @@ median_diff <- function (path, neg_type){
   writeData(wb, "P-Value Matrix", pvalue_matrix, rowNames = TRUE)
   saveWorkbook(wb, wb_name, overwrite = TRUE)
 
-  col_fun1 = circlize::colorRamp2(c(-1, 2), c("red", "green"))
-  Heatmap(
-    pvalue_matrix,
-    name = "Median_difference",
-    col = col_fun1,
-    rect_gp = gpar(type = "none"),
-    column_order = lncs_keep,
+  col_fun1 = circlize::colorRamp2(c(-1, 1), c("red", "green"))
+  Heatmap(pvalue_matrix, name = "Median_difference", col = col_fun1, rect_gp = gpar(type = "none"),
+    column_order = c("TPX-validated_lncRNAs_average", "CDKN2B-AS1", "HOTAIR", "lncSmad7", "Meg3", "MEG3",  "NEAT1", "TERC", "1200007C13Rik@4T1", "1200007C13Rik@NDL", "4930519L02Rik", "7SK", "9530018H14Rik@GLIAL", "9530018H14Rik@LIMB", "AC018781.1", "AC087482.1", "AL109615.3", "Bloodlinc", "CPEB2-DT", "Eprn", "HAND2-AS1", "MALAT1", "MIR503HG", "Rn7sk", "SRA1", "Tug1", "Total_average"),
     cell_fun = function(j, i, x, y, width, height, fill) {
-      grid.rect(
-        x = x, y = y, width = width, height = height,
-        gp = gpar(col = "grey", fill = NA)
-      )
-      grid.circle(
-        x = x, y = y,
-        r = (-log10(pvalue_matrix[i, j])) / 8.5 * min(unit.c(width, height)),
-        gp = gpar(fill = col_fun1(median_matrix[i, j]), col = NA)
-      )
-    },
-    cluster_rows = FALSE,
-    cluster_columns = FALSE
-  )
-    
+      grid.rect(x = x, y = y, width = width, height = height, 
+            gp = gpar(col = "grey", fill = NA))
+        grid.circle(x = x, y = y, r = (-log10(pvalue_matrix[i, j]))/8.5 * min(unit.c(width, height)), 
+                gp = gpar(fill = col_fun1(median_matrix[i, j]), col = NA))
+    }, cluster_rows = FALSE, cluster_columns = FALSE)
 }
 ```
 
 
 ```{r, fig.width=25, fig.height=7}
-path = "ca_neg_regions/specific-no_low_DNase/ALL_shape.aggregated.fixed.gz"
+path = "best_param_3plex/ALL_shape.aggregated.rearranged.gz"
+path = "ca_neg_regions/general_cCRE/ALL_shape.aggregated.fixed.gz"
 
 pdf("Median_diff.heatmap.pdf", width = 12, height = 5, pointsize = 13)
-median_diff("ca_neg_regions/specific-no_low_DNase/ALL_shape.aggregated.fixed.gz", "biosample_specific_cCREs")
+median_diff("best_param_3plex/ALL_shape.aggregated.rearranged.gz", "random")
+median_diff("ca_neg_regions/general_cCRE/ALL_shape.aggregated.fixed.gz", "all_cCREs")
 dev.off()
 ```
