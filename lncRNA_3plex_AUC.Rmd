@@ -1,0 +1,263 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(pROC)
+
+setwd("/home/molinerislab/RNABSdb_3DDNA/dataset/v1/")
+single_models_AUC <- function (stability, df_path, color_sonly, color_shape, title){
+  set.seed(95)
+  set.seed(42)
+  
+  formula_with_shapes <- as.formula(paste("pos_neg ~", stability, "+ HelT + MGW + ProT + Roll"))
+  formula_stability_only <- as.formula(paste("pos_neg ~", stability))
+  
+  pre_df<-read.table(df_path, header = T)
+  #df <- pre_df #all lncRNAs
+  if (title == "Biosample-specific cCREs Negatives"){
+    df <- pre_df[pre_df$lncRNA %in% c("NEAT1", "TERC", "MEG3", "lncSmad7", "HOTAIR", "CDKN2B-AS1"), ]
+  } else {
+    df <- pre_df[pre_df$lncRNA %in% c("NEAT1", "TERC", "MEG3", "lncSmad7", "HOTAIR", "CDKN2B-AS1", "Meg3"), ]
+  }
+  
+  df$pos_neg<-factor(df$pos_neg, levels=c("pos","neg"))
+  min_rows <- min(table(df$lncRNA))
+  df %>% group_by(lncRNA) %>% sample_n(min_rows) -> df_balanced
+  
+  model_with_shapes <- glm(formula_with_shapes, family = binomial(link = "logit"), data=df_balanced, na.action = na.exclude)
+  summary <- summary(model_with_shapes)
+  model_stability_only <- glm(formula_stability_only, family = binomial(link = "logit"), data = df_balanced)
+
+  anova <- anova(model_stability_only, model_with_shapes, test="Chisq")
+
+  model_stability_only.predict <- predict(model_stability_only, newdata = df_balanced, type="response")
+  model_with_shapes.predict <- predict(model_with_shapes, newdata = df_balanced, type="response")
+  model_stability_only.predict.roc <- roc(df_balanced$pos_neg, model_stability_only.predict)
+  model_with_shapes.predict.roc <- roc(df_balanced$pos_neg, model_with_shapes.predict)
+  model_stability_only.predict.roc.auc <- auc(model_stability_only.predict.roc)
+  model_with_shapes.predict.roc.auc <- auc(model_with_shapes.predict.roc)
+  
+  par(pty = "s")
+  roc <- plot.roc(model_stability_only.predict.roc, main= title, col=color_sonly, lwd=2, cex.main = 1)
+  lines.roc(model_with_shapes.predict.roc, col=color_shape, lwd=2)
+  legend("bottomright", 
+       legend = c(
+         paste("Stability only (AUC =", round(model_stability_only.predict.roc.auc, 2), ")"),
+         paste("Including shape (AUC =", round(model_with_shapes.predict.roc.auc, 2), ")")), 
+       col = c(color_sonly, color_shape), lwd = 2, cex = 0.75)
+  par(pty = "m")
+  
+  return(list (summary, anova, roc))
+}
+
+```
+
+```{r}
+comparison_models_AUC <- function (condition, stability, df_path, comparison_path){
+  setwd("/home/molinerislab/RNABSdb_3DDNA/dataset/v1/")
+  set.seed(42)
+
+  formula_with_shapes <- as.formula(paste("pos_neg ~", stability, "+ HelT + MGW + ProT + Roll"))
+  formula_stability_only <- as.formula(paste("pos_neg ~", stability))
+  
+  pre_df<-read.table(df_path, header = T)
+  #df <- pre_df #all lncRNAs
+  df <- pre_df[pre_df$lncRNA %in% c("NEAT1", "TERC", "MEG3", "Meg3", "lncSmad7", "HOTAIR", "CDKN2B-AS1"), ]
+  random_df<-read.table(comparison_path, header = T)
+  random_df$pos_neg<-factor(random_df$pos_neg, levels=c("pos","neg"))
+  random_min_rows <- min(table(random_df$lncRNA))
+  random_df %>% group_by(lncRNA) %>% sample_n(random_min_rows) -> random_df_balanced
+
+  random_model_with_shapes <- glm(formula_with_shapes, family = binomial(link = "logit"), data=random_df_balanced, na.action = na.exclude)
+  random_model_stability_only <- glm(formula_stability_only, family = binomial(link = "logit"), data = random_df_balanced)
+
+  random_model_stability_only.predict <- predict(random_model_stability_only, newdata = random_df_balanced, type="response")
+  random_model_with_shapes.predict <- predict(random_model_with_shapes, newdata = random_df_balanced, type="response")
+  random_model_stability_only.predict.roc <- roc(random_df_balanced$pos_neg, random_model_stability_only.predict)
+  random_model_with_shapes.predict.roc <- roc(random_df_balanced$pos_neg, random_model_with_shapes.predict)
+  random_model_stability_only.predict.roc.auc <- auc(random_model_stability_only.predict.roc)
+  random_model_with_shapes.predict.roc.auc <- auc(random_model_with_shapes.predict.roc)
+  
+  #seed reset to keep data consistent across analyses
+  set.seed(95)
+  set.seed(42)
+  
+  pre_ca_df<-read.table(df_path, header = T)
+  ca_df <- pre_ca_df #all lncRNAs
+  ca_df$pos_neg<-factor(ca_df$pos_neg, levels=c("pos","neg"))
+  ca_min_rows <- min(table(ca_df$lncRNA))
+  ca_df %>% group_by(lncRNA) %>% sample_n(ca_min_rows) -> ca_df_balanced
+  
+  ca_model_with_shapes <- glm(formula_with_shapes, family = binomial(link = "logit"), data=ca_df_balanced, na.action = na.exclude)
+  summary <- summary(ca_model_with_shapes)
+  ca_model_stability_only <- glm(formula_stability_only, family = binomial(link = "logit"), data = ca_df_balanced)
+
+  anova <- anova(ca_model_stability_only, ca_model_with_shapes, test="Chisq")
+
+  ca_model_stability_only.predict <- predict(ca_model_stability_only, newdata = ca_df_balanced, type="response")
+  ca_model_with_shapes.predict <- predict(ca_model_with_shapes, newdata = ca_df_balanced, type="response")
+  ca_model_stability_only.predict.roc <- roc(ca_df_balanced$pos_neg, ca_model_stability_only.predict)
+  ca_model_with_shapes.predict.roc <- roc(ca_df_balanced$pos_neg, ca_model_with_shapes.predict)
+  ca_model_stability_only.predict.roc.auc <- auc(ca_model_stability_only.predict.roc)
+  ca_model_with_shapes.predict.roc.auc <- auc(ca_model_with_shapes.predict.roc)
+  
+  roc <- plot.roc(ca_model_stability_only.predict.roc, main= paste("General ROC Curve Comparison of", condition, " -", stability), col="gold1", lwd=2, cex.main = 0.85)
+  lines.roc(ca_model_with_shapes.predict.roc, col="goldenrod1", lwd=2)
+  lines.roc(random_model_stability_only.predict.roc, col="steelblue2", lwd=2)
+  lines.roc(random_model_with_shapes.predict.roc, col="royalblue2", lwd=2)
+  legend("bottomright", 
+       legend = c(
+         paste("Model stability only - cCREs aware neg (AUC =", round(ca_model_stability_only.predict.roc.auc, 3), ")"),
+         paste("Model with shapes - cCREs aware neg (AUC =", round(ca_model_with_shapes.predict.roc.auc, 3), ")"),
+         paste("Model stability only - random neg (AUC =", round(random_model_stability_only.predict.roc.auc, 3), ")"),
+         paste("Model with shapes - random neg (AUC =", round(random_model_with_shapes.predict.roc.auc, 3), ")")
+       ),
+       col = c("gold1", "goldenrod1", "steelblue2", "royalblue2"), lwd = 2, cex = 0.75)
+  
+  return(list (summary, anova, roc))
+}
+```
+
+
+```{r}
+triple_comparison_AUC <- function (stability){
+  setwd("/home/molinerislab/RNABSdb_3DDNA/dataset/v1/")
+  set.seed(95)
+  set.seed(42)
+
+  formula_with_shapes <- as.formula(paste("pos_neg ~", stability, "+ HelT + MGW + ProT + Roll"))
+  formula_stability_only <- as.formula(paste("pos_neg ~", stability))
+
+  
+#--- Random Negatives ---    
+  df<-read.table("best_param_3plex/ALL_shape.3plex_stability.matrix.gz", header = T)
+  random_df <- df[df$lncRNA %in% c("NEAT1", "TERC", "MEG3", "lncSmad7", "HOTAIR", "CDKN2B-AS1"), ] #Meg3
+  random_df$pos_neg<-factor(random_df$pos_neg, levels=c("pos","neg"))
+  random_min_rows <- min(table(random_df$lncRNA))
+  random_df %>% group_by(lncRNA) %>% sample_n(random_min_rows) -> random_df_balanced
+
+  random_model_with_shapes <- glm(formula_with_shapes, family = binomial(link = "logit"), data=random_df_balanced, na.action = na.exclude)
+  random_model_stability_only <- glm(formula_stability_only, family = binomial(link = "logit"), data = random_df_balanced)
+
+  random_model_stability_only.predict <- predict(random_model_stability_only, newdata = random_df_balanced, type="response")
+  random_model_with_shapes.predict <- predict(random_model_with_shapes, newdata = random_df_balanced, type="response")
+  random_model_stability_only.predict.roc <- roc(random_df_balanced$pos_neg, random_model_stability_only.predict)
+  random_model_with_shapes.predict.roc <- roc(random_df_balanced$pos_neg, random_model_with_shapes.predict)
+  random_model_stability_only.predict.roc.auc <- auc(random_model_stability_only.predict.roc)
+  random_model_with_shapes.predict.roc.auc <- auc(random_model_with_shapes.predict.roc)
+ 
+  
+# --- All cCREs Negatives ---
+  
+  #seed reset to keep data consistent across analyses
+  set.seed(95)
+  set.seed(42)
+  
+  df<-read.table("ca_neg_regions/general_cCRE/ALL_shape.3plex_stability.matrix.gz", header = T)
+  all_ccre_df <- df[df$lncRNA %in% c("NEAT1", "TERC", "MEG3", "lncSmad7", "HOTAIR", "CDKN2B-AS1"), ]  #Meg3
+  all_ccre_df$pos_neg<-factor(all_ccre_df$pos_neg, levels=c("pos","neg"))
+  all_ccre_min_rows <- min(table(all_ccre_df$lncRNA))
+  all_ccre_df %>% group_by(lncRNA) %>% sample_n(all_ccre_min_rows) -> all_ccre_df_balanced
+  
+  all_ccre_model_with_shapes <- glm(formula_with_shapes, family = binomial(link = "logit"), data=all_ccre_df_balanced, na.action = na.exclude)
+  summary <- summary(all_ccre_model_with_shapes)
+  all_ccre_model_stability_only <- glm(formula_stability_only, family = binomial(link = "logit"), data = all_ccre_df_balanced)
+
+  anova <- anova(all_ccre_model_stability_only, all_ccre_model_with_shapes, test="Chisq")
+
+  all_ccre_model_stability_only.predict <- predict(all_ccre_model_stability_only, newdata = all_ccre_df_balanced, type="response")
+  all_ccre_model_with_shapes.predict <- predict(all_ccre_model_with_shapes, newdata = all_ccre_df_balanced, type="response")
+  all_ccre_model_stability_only.predict.roc <- roc(all_ccre_df_balanced$pos_neg, all_ccre_model_stability_only.predict)
+  all_ccre_model_with_shapes.predict.roc <- roc(all_ccre_df_balanced$pos_neg, all_ccre_model_with_shapes.predict)
+  all_ccre_model_stability_only.predict.roc.auc <- auc(all_ccre_model_stability_only.predict.roc)
+  all_ccre_model_with_shapes.predict.roc.auc <- auc(all_ccre_model_with_shapes.predict.roc)
+  
+#--- Biosample-specific cCREs Negatives ---
+  set.seed(95)
+  set.seed(42)
+  
+  df<-read.table("ca_neg_regions/specific-no_low_DNase/ALL_shape.3plex_stability.matrix.gz", header = T)
+  bio_ccre_df <- df[df$lncRNA %in% c("NEAT1", "TERC", "MEG3", "lncSmad7", "HOTAIR", "CDKN2B-AS1"), ]  #Meg3
+  bio_ccre_df$pos_neg<-factor(bio_ccre_df$pos_neg, levels=c("pos","neg"))
+  bio_ccre_min_rows <- min(table(bio_ccre_df$lncRNA))
+  bio_ccre_df %>% group_by(lncRNA) %>% sample_n(bio_ccre_min_rows) -> bio_ccre_df_balanced
+  
+  bio_ccre_model_with_shapes <- glm(formula_with_shapes, family = binomial(link = "logit"), data=bio_ccre_df_balanced, na.action = na.exclude)
+  summary <- summary(bio_ccre_model_with_shapes)
+  bio_ccre_model_stability_only <- glm(formula_stability_only, family = binomial(link = "logit"), data = bio_ccre_df_balanced)
+
+  anova <- anova(bio_ccre_model_stability_only, bio_ccre_model_with_shapes, test="Chisq")
+
+  bio_ccre_model_stability_only.predict <- predict(bio_ccre_model_stability_only, newdata = bio_ccre_df_balanced, type="response")
+  bio_ccre_model_with_shapes.predict <- predict(bio_ccre_model_with_shapes, newdata = bio_ccre_df_balanced, type="response")
+  bio_ccre_model_stability_only.predict.roc <- roc(bio_ccre_df_balanced$pos_neg, bio_ccre_model_stability_only.predict)
+  bio_ccre_model_with_shapes.predict.roc <- roc(bio_ccre_df_balanced$pos_neg, bio_ccre_model_with_shapes.predict)
+  bio_ccre_model_stability_only.predict.roc.auc <- auc(bio_ccre_model_stability_only.predict.roc)
+  bio_ccre_model_with_shapes.predict.roc.auc <- auc(bio_ccre_model_with_shapes.predict.roc)  
+  
+  
+  roc <- plot.roc(all_ccre_model_stability_only.predict.roc, main= paste("General ROC Curve Comparison -", stability), col="gold1", lwd=2, cex.main = 0.85)
+  lines.roc(all_ccre_model_with_shapes.predict.roc, col="goldenrod1", lwd=2)
+  lines.roc(random_model_stability_only.predict.roc, col="steelblue2", lwd=2)
+  lines.roc(random_model_with_shapes.predict.roc, col="royalblue2", lwd=2)
+  lines.roc(bio_ccre_model_stability_only.predict.roc, col="mediumorchid2", lwd=2)
+  lines.roc(bio_ccre_model_with_shapes.predict.roc, col="purple2", lwd=2)
+  legend("bottomright", 
+       legend = c(
+        paste("Model stability only - random (AUC =", round(random_model_stability_only.predict.roc.auc, 3), ")"),
+        paste("Model with shapes - random (AUC =", round(random_model_with_shapes.predict.roc.auc, 3), ")"),
+        paste("Model stability only - all cCREs (AUC =", round(all_ccre_model_stability_only.predict.roc.auc, 3), ")"),
+        paste("Model with shapes - all cCREs (AUC =", round(all_ccre_model_with_shapes.predict.roc.auc, 3), ")"),
+        paste("Model stability only - biosample cCREs (AUC =", round(bio_ccre_model_stability_only.predict.roc.auc, 3), ")"),
+        paste("Model with shapes - biosample cCREs (AUC =", round(bio_ccre_model_with_shapes.predict.roc.auc, 3), ")")       
+       ), 
+       col = c("steelblue2", "royalblue2", "gold1", "goldenrod1", "mediumorchid2", "purple2"), lwd = 2, cex = 0.75)
+  
+ par(pty = "s")
+ roc <- plot.roc(all_ccre_model_stability_only.predict.roc, main= paste("General ROC Curve Comparison -", stability), col="gold1", lwd=2, cex.main = 0.85)
+  lines.roc(all_ccre_model_with_shapes.predict.roc, col="goldenrod1", lwd=2)
+  lines.roc(random_model_stability_only.predict.roc, col="steelblue2", lwd=2)
+  lines.roc(random_model_with_shapes.predict.roc, col="royalblue2", lwd=2)
+  lines.roc(bio_ccre_model_stability_only.predict.roc, col="mediumorchid2", lwd=2)
+  lines.roc(bio_ccre_model_with_shapes.predict.roc, col="purple2", lwd=2)
+  
+  par(pty = "m")
+  return(list (summary, anova, roc))
+}
+```
+
+```{r}
+stability = "Stability_best"
+df_path = "best_param_3plex/ALL_shape.3plex_stability.matrix.gz"
+
+pdf("Stability_best.ROC_for_paper.pdf", width = 7, height = 5, pointsize = 13)
+single_models_AUC("Stability_best", "best_param_3plex/ALL_shape.3plex_stability.matrix.gz", "steelblue2", "royalblue2", "Random Negatives")
+single_models_AUC("Stability_best", "ca_neg_regions/general_cCRE/ALL_shape.3plex_stability.matrix.gz", "gold1", "goldenrod1", "cCRE balanced Negatives")
+single_models_AUC("Stability_best", "ca_neg_regions/specific-no_low_DNase/ALL_shape.3plex_stability.matrix.gz", "mediumorchid2", "purple2", "Biosample-Specific cCREs Negatives")
+dev.off()
+```
+
+```{r}
+single_models_AUC("Stability_best", "best_param_3plex/ALL_shape.3plex_stability.matrix.gz", "steelblue2", "royalblue2", "Random Negatives")
+```
+
+```{r}
+single_models_AUC("Stability_best", "ca_neg_regions/general_cCRE/ALL_shape.3plex_stability.matrix.gz", "gold1", "goldenrod1", "cCRE balanced negatives")
+```
+
+
+```{r}
+single_models_AUC("Stability_best", "ca_neg_regions/specific-no_low_DNase/ALL_shape.3plex_stability.matrix.gz", "mediumorchid2", "purple2", "Biosample-specific cCREs")
+```
+
+
+```{r}
+triple_comparison_AUC("Stability_best")
+triple_comparison_AUC("Stability_norm")
+triple_comparison_AUC("Stability_best + Stability_norm")
+```
+

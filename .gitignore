@@ -4,5 +4,9 @@
 *.RData
 *.rds
 *.tsv
+*.csvs
 *.gz
 *.html
+.gitignore
+*.matrix
+ALL_shape.3plex_stability.matrix

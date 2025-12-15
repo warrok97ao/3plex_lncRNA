@@ -1,0 +1,80 @@
+HUMAN_LNCRNAs:  
+  - 7SK 
+  - AC018781.1
+  - AC087482.1
+  - AL109615.3
+  - CDKN2B-AS1
+  - CPEB2-DT
+  - HAND2-AS1
+  - HOTAIR
+  - MALAT1
+  - MEG3
+  - MIR503HG
+  - NEAT1
+  - SRA1
+  - TERC
+   
+MOUSE_LNCRNAs:
+  - 1200007C13Rik@4T1
+  - 1200007C13Rik@NDL
+  - 4930519L02Rik
+  - 9530018H14Rik@GLIAL
+  - 9530018H14Rik@LIMB
+#  - AK156552.1
+  - Bloodlinc
+  - Eprn
+  - lncSmad7
+  - Meg3
+  - Rn7sk
+  - Tug1
+    
+SHAPEFEATURES:
+  - HelT
+  - MGW
+  - ProT
+  - Roll
+
+  
+LNCRNAs:
+  - 1200007C13Rik@4T1
+  - 1200007C13Rik@NDL
+  - 4930519L02Rik
+  - 7SK
+  - 9530018H14Rik@GLIAL
+  - 9530018H14Rik@LIMB
+  - AC018781.1
+  - AC087482.1
+  - AL109615.3
+  - Bloodlinc
+  - CDKN2B-AS1
+  - CPEB2-DT
+  - Eprn
+  - general
+  - HAND2-AS1
+  - HOTAIR
+  - lncSmad7
+  - MALAT1
+  - Meg3
+  - MEG3
+  - MIR503HG
+  - NEAT1
+  - Rn7sk
+  - SRA1
+  - TERC
+  - Tug1
+
+STABILITY:
+  #- Stability_norm
+  - Stability_best
+  #- Stability_norm-best
+  
+NEG_TYPES:
+  - all_cCREs
+  #- no_low_DNase_cCREs
+  #- PLS_pELS_dELS_only
+  - random
+
+
+GENCODE_SPECIES: "hsapiens"
+GENCODE_VERSION: "32"
+GENOME_ASSEMBLY: "GRCh38"

@@ -1,0 +1,50 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+```{r, fig.width=12, fig.height=9}
+library(ggplot2)
+library(ggpubr)
+ 
+setwd("/home/molinerislab/RNABSdb_3DDNA/dataset/v1")
+df <- read.table("ALL_shape.aggregated.fixed.gz", header=T, sep="\t")
+df.selected<-df[df$lncRNA=="7SK",]
+class(df$Mean)
+
+q <- ggplot(data=df,aes(x=pos_neg, y=Mean, fill=pos_neg))+geom_boxplot(outlier.colour = NA)+
+     facet_grid(Shape~lncRNA, scales = "free_y")
+wilcoxon <- p + stat_compare_means(method = "wilcox.test", aes(label = paste0('p =', ..p.format..)))
+wilcoxon
+
+```
+
+```{r, fig.width=12, fig.height=9}
+library(ggplot2)
+library(ggpubr)
+ 
+setwd("/home/molinerislab/RNABSdb_3DDNA/dataset/v1")
+df <- read.table("ALL_shape.aggregated.fixed.gz", header=T, sep="\t")
+
+#boxplot.stats(x)$stats[1] e boxplot.stats(x)$stats[5] contengono il punto più alto e più basso della barra
+filter_out_outlayers <- function(x){
+  l <- boxplot.stats(x)$stats[1]
+  u <- boxplot.stats(x)$stats[5]
+
+  for (i in 1:length(x)){
+    x[i] <- ifelse(x[i]>l & x[i]<u, x[i], NA)
+  }
+  return(x)
+}
+
+df %>% group_by(lncRNA, Shape, pos_neg) %>% mutate(mean = filter_out_outlayers(Mean)) %>%
+ggplot(aes(x=pos_neg, y=mean, fill=pos_neg)) + geom_boxplot(na.rm = TRUE, coef = 5) +
+facet_grid(Shape~lncRNA, scales = "free_y") -> p
+
+wilcoxon <- p + stat_compare_means(method = "wilcox.test", aes(label = paste0('p =', ..p.format..)))
+wilcoxon
+
+```
